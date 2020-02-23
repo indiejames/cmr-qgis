@@ -24,7 +24,7 @@
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction, QTableWidgetItem
-from qgis.core import QgsProject
+from qgis.core import QgsProject, QgsSettings
 
 # Initialize Qt resources from file resources.py
 from .resources import *
@@ -199,6 +199,9 @@ class CmrQgis:
             self.first_start = False
             self.dlg = CmrQgisDialog()
 
+        # get stored settings
+        settings = QgsSettings()
+
         # Fetch the currently loaded layers
         layers = QgsProject.instance().layerTreeRoot().children()
         # Clear the contents of the comboBox from previous runs
@@ -206,8 +209,17 @@ class CmrQgis:
         # Populate the comboBox with names of all the loaded layers
         self.dlg.comboBox.addItems([layer.name() for layer in layers])
 
+        # fill the cmr url input with the saved setting if available
+        cmrUrl = settings.value("cmr_qgis/cmr_search_url")
+        if cmrUrl:
+            self.dlg.cmrUrlLineEdit.setText(cmrUrl)
+
+        # populate the concept type combo box
         self.dlg.comboBoxConceptType.clear()
         self.dlg.comboBoxConceptType.addItems(['collection', 'granule'])
+        conceptTypeIndex = settings.value("cmr_qgis/concept_type")
+        if conceptTypeIndex:
+            self.dlg.comboBoxConceptType.setCurrentIndex(conceptTypeIndex)
 
         # set the table header
         self.dlg.tableWidget.setHorizontalHeaderLabels('Parameter;Value'.split(';'))
@@ -225,3 +237,11 @@ class CmrQgis:
             # substitute with your code.
             #pass
             layer = str(self.dlg.comboBox.currentText())
+
+            # save the cmr url to settings
+            cmrSearchUrl = self.dlg.cmrUrlLineEdit.text()
+            if cmrSearchUrl != "":
+                settings.setValue("cmr_qgis/cmr_search_url", cmrSearchUrl)
+
+            # save concept type to settings
+            settings.setValue("cmr_qgis/concept_type", self.dlg.comboBoxConceptType.currentIndex())
