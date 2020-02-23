@@ -23,7 +23,8 @@
 """
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication
 from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import QAction
+from qgis.PyQt.QtWidgets import QAction, QTableWidgetItem
+from qgis.core import QgsProject
 
 # Initialize Qt resources from file resources.py
 from .resources import *
@@ -179,6 +180,15 @@ class CmrQgis:
                 action)
             self.iface.removeToolBarIcon(action)
 
+    def addSearchParameter(self):
+        """Add a search parameter to the parameter table"""
+        line = self.dlg.lineEdit.text()
+        parameter, value = line.split('=')
+        rowPosition = self.dlg.tableWidget.rowCount()
+        self.dlg.tableWidget.insertRow(rowPosition)
+        self.dlg.tableWidget.setItem(rowPosition, 0, QTableWidgetItem(parameter))
+        self.dlg.tableWidget.setItem(rowPosition, 1, QTableWidgetItem(value))
+        self.dlg.lineEdit.clear()
 
     def run(self):
         """Run method that performs all the real work"""
@@ -189,6 +199,22 @@ class CmrQgis:
             self.first_start = False
             self.dlg = CmrQgisDialog()
 
+        # Fetch the currently loaded layers
+        layers = QgsProject.instance().layerTreeRoot().children()
+        # Clear the contents of the comboBox from previous runs
+        self.dlg.comboBox.clear()
+        # Populate the comboBox with names of all the loaded layers
+        self.dlg.comboBox.addItems([layer.name() for layer in layers])
+
+        self.dlg.comboBoxConceptType.clear()
+        self.dlg.comboBoxConceptType.addItems(['collection', 'granule'])
+
+        # set the table header
+        self.dlg.tableWidget.setHorizontalHeaderLabels('Parameter;Value'.split(';'))
+
+        # add a parameter/value when the 'Add' button is clicked
+        self.dlg.addButton.clicked.connect(self.addSearchParameter)
+
         # show the dialog
         self.dlg.show()
         # Run the dialog event loop
@@ -197,4 +223,5 @@ class CmrQgis:
         if result:
             # Do something useful here - delete the line containing pass and
             # substitute with your code.
-            pass
+            #pass
+            layer = str(self.dlg.comboBox.currentText())
