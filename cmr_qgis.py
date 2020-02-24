@@ -24,7 +24,10 @@
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction, QTableWidgetItem
-from qgis.core import QgsProject, QgsSettings
+from qgis.core import QgsProject, QgsSettings, QgsVectorLayer
+from zipfile import ZipFile
+from tempfile import NamedTemporaryFile
+import requests
 
 # Initialize Qt resources from file resources.py
 from .resources import *
@@ -183,12 +186,13 @@ class CmrQgis:
     def addSearchParameter(self):
         """Add a search parameter to the parameter table"""
         line = self.dlg.lineEdit.text()
-        parameter, value = line.split('=')
-        rowPosition = self.dlg.tableWidget.rowCount()
-        self.dlg.tableWidget.insertRow(rowPosition)
-        self.dlg.tableWidget.setItem(rowPosition, 0, QTableWidgetItem(parameter))
-        self.dlg.tableWidget.setItem(rowPosition, 1, QTableWidgetItem(value))
-        self.dlg.lineEdit.clear()
+        if line.find('=') > 0:
+            parameter, value = line.split('=')
+            rowPosition = self.dlg.tableWidget.rowCount()
+            self.dlg.tableWidget.insertRow(rowPosition)
+            self.dlg.tableWidget.setItem(rowPosition, 0, QTableWidgetItem(parameter))
+            self.dlg.tableWidget.setItem(rowPosition, 1, QTableWidgetItem(value))
+            self.dlg.lineEdit.clear()
 
     def run(self):
         """Run method that performs all the real work"""
@@ -221,6 +225,9 @@ class CmrQgis:
         if conceptTypeIndex:
             self.dlg.comboBoxConceptType.setCurrentIndex(conceptTypeIndex)
 
+        # clear the table
+        self.dlg.tableWidget.setRowCount(0)
+
         # set the table header
         self.dlg.tableWidget.setHorizontalHeaderLabels('Parameter;Value'.split(';'))
 
@@ -233,13 +240,47 @@ class CmrQgis:
         result = self.dlg.exec_()
         # See if OK was pressed
         if result:
-            # Do something useful here - delete the line containing pass and
-            # substitute with your code.
-            #pass
-            layer = str(self.dlg.comboBox.currentText())
+            
+            layerName = str(self.dlg.comboBox.currentText())
+            # TODO handle the case where there is more than one layer by this name
+            layer = QgsProject.instance().mapLayersByName(layerName)[0]
+            directory = os.path.split(layer.source())[0]
+            
+            # tempFile = NamedTemporaryFile()
+            # print(tempFile.name)
+            tempFile = '/tmp/cmr-qgis.zip'
+            with ZipFile(tempFile, 'w') as zipObj:
+                for ext in ['shp', 'cpg', 'dbf', 'prj', 'shx', 'qpj']:
+                    filePath = directory + "/" + layerName + '.' + ext
+                    zipObj.write(filePath, layerName + '.' + ext)
+            # query the CMR
+            cmrSearchUrl = self.dlg.cmrUrlLineEdit.text()
+            cmrQueryUrl = cmrSearchUrl + "/" + self.dlg.comboBoxConceptType.currentText() + 's.kml'
+            tempFileHandle = open(tempFile, 'rb')
+            multipart_form_data = {
+                'shapefile': (layerName + '.zip', tempFileHandle, 'application/shapefile+zip')
+            }
+
+            rowCount = self.dlg.tableWidget.rowCount()
+            for row in range(rowCount):
+                parameter = self.dlg.tableWidget.item(row, 0).text()
+                value = self.dlg.tableWidget.item(row, 1).text()
+                multipart_form_data[parameter] = (None, value)
+
+            resp = requests.post(cmrQueryUrl, files=multipart_form_data)
+
+            tempFileHandle.close()
+            os.remove(tempFile)
+            
+            tmpFile = '/tmp/' + layerName + "-cmr.kml"
+            with open(tmpFile, 'w') as f:
+                f.write(resp.text)
+            myLayer = QgsVectorLayer(tmpFile, layerName + '-cmr', 'ogr')
+            QgsProject.instance().addMapLayer(myLayer)
+
+            resp.close()
 
             # save the cmr url to settings
-            cmrSearchUrl = self.dlg.cmrUrlLineEdit.text()
             if cmrSearchUrl != "":
                 settings.setValue("cmr_qgis/cmr_search_url", cmrSearchUrl)
 
