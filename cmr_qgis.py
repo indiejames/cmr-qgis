@@ -208,10 +208,17 @@ class CmrQgis:
 
         # Fetch the currently loaded layers
         layers = QgsProject.instance().layerTreeRoot().children()
+        layerNames = [layer.name() for layer in layers]
+
         # Clear the contents of the comboBox from previous runs
         self.dlg.comboBox.clear()
         # Populate the comboBox with names of all the loaded layers
-        self.dlg.comboBox.addItems([layer.name() for layer in layers])
+        self.dlg.comboBox.addItems(layerNames)
+
+        # use the previous layer as the default if it is in the existing layers
+        layerName = settings.value("cmr_qgis/layer")
+        if layerName and layerName in layerNames:
+            self.dlg.comboBox.setCurrentIndex(layerNames.index(layerName))
 
         # fill the cmr url input with the saved setting if available
         cmrUrl = settings.value("cmr_qgis/cmr_search_url")
@@ -284,6 +291,9 @@ class CmrQgis:
             # save the cmr url to settings
             if cmrSearchUrl != "":
                 settings.setValue("cmr_qgis/cmr_search_url", cmrSearchUrl)
+
+            # save the chosen layer to settings
+            settings.setValue("cmr_qgis/layer", layerName)
 
             # save concept type to settings
             settings.setValue("cmr_qgis/concept_type", self.dlg.comboBoxConceptType.currentIndex())
