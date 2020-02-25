@@ -240,19 +240,20 @@ class CmrQgis:
         result = self.dlg.exec_()
         # See if OK was pressed
         if result:
-            
+
             layerName = str(self.dlg.comboBox.currentText())
             # TODO handle the case where there is more than one layer by this name
             layer = QgsProject.instance().mapLayersByName(layerName)[0]
             directory = os.path.split(layer.source())[0]
-            
+
             # tempFile = NamedTemporaryFile()
             # print(tempFile.name)
             tempFile = '/tmp/cmr-qgis.zip'
             with ZipFile(tempFile, 'w') as zipObj:
                 for ext in ['shp', 'cpg', 'dbf', 'prj', 'shx', 'qpj']:
                     filePath = directory + "/" + layerName + '.' + ext
-                    zipObj.write(filePath, layerName + '.' + ext)
+                    if os.path.exists(filePath):
+                        zipObj.write(filePath, layerName + '.' + ext)
             # query the CMR
             cmrSearchUrl = self.dlg.cmrUrlLineEdit.text()
             cmrQueryUrl = cmrSearchUrl + "/" + self.dlg.comboBoxConceptType.currentText() + 's.kml'
@@ -271,7 +272,7 @@ class CmrQgis:
 
             tempFileHandle.close()
             os.remove(tempFile)
-            
+
             tmpFile = '/tmp/' + layerName + "-cmr.kml"
             with open(tmpFile, 'w') as f:
                 f.write(resp.text)
