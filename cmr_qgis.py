@@ -230,7 +230,7 @@ class CmrQgis:
         self.dlg.comboBoxConceptType.addItems(['collection', 'granule'])
         conceptTypeIndex = settings.value("cmr_qgis/concept_type")
         if conceptTypeIndex:
-            self.dlg.comboBoxConceptType.setCurrentIndex(conceptTypeIndex)
+            self.dlg.comboBoxConceptType.setCurrentIndex(int(conceptTypeIndex))
 
         # clear the table
         self.dlg.tableWidget.setRowCount(0)
